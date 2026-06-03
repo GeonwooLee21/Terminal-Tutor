@@ -2,6 +2,11 @@
 import os
 import subprocess
 
+from rich.console import Console
+from rich.table import Table
+
+console = Console()
+
 state = {
     "current_dir": os.getcwd(), # 현재 경로
     "last_output": "",          # 마지막 명령어 출력
@@ -66,6 +71,52 @@ def change_directory(state):
         # 4. 실패하면 오류 메시지를 반환 및 기존 경로 유지
         return f"❌ '{target}' 폴더를 찾을 수 없습니다."
 
+def get_arg_buttons(command, state):
+    entries = os.listdir(state["current_dir"])
+
+    if command == "cd":
+        folders = [e for e in entries if os.path.isdir(os.path.join(state["current_dir"], e))]
+        targets = ["..", "."] + sorted(folders)
+    else:
+        targets = sorted(entries)
+
+    return [Button(label=t, command=f"{command} {t}") for t in targets]
+
+def show_keypad(buttons, state):
+    console.print(f"\n 📁 현재 위치: [bold cyan]{state['current_dir']}[/bold cyan]\n")
+
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column()
+    table.add_column()
+    table.add_column()
+
+    # 버튼 3개씩 묶어서 행으로 추가
+    row = []
+    for i, btn in enumerate(buttons):
+        label = f"[{i+1}] {btn.label}"
+        if btn.dangerous:
+            row.append(f"[bold red]{label}[/bold red]")
+        else:
+            row.append(label)
+
+        if len(row) == 3:
+            table.add_row(*row)
+            row = []
+
+    # 남은 버튼 처리 (버튼 수가 3의 배수가 아닐 때)
+    if row:
+        while len(row) < 3:
+            row.append("")
+        table.add_row(*row)
+
+    console.print(table)
+    console.print("─" * 40)
+
+ARG_PROMPTS = {
+    "mkdir": "생성할 폴더명을 입력하세요",
+    "touch": "생성할 파일명을 입력하세요",
+}
+
 keypad_buttons = [
     # 탐색 (Navigation)
     Button(label='ls', command='ls'),
@@ -85,24 +136,6 @@ keypad_buttons = [
     Button(label='rm -rf',command='rm -rf',dangerous=True)
 ]
 
-def show_keypad(buttons, state):
-    # 현재 경로 표시
-    print("=" * 60)
-    print(f" 📁 현재 위치: {state['current_dir']}")
-    print("=" * 60)
-
-    # 버튼을 번호와 함께 출력 (3열 배치)
-    for i, btn in enumerate(buttons):
-        number = f"[{i + 1}]"
-        label = btn.label
-        print(f"  {number:<5} {label:<10}", end="")
-        # 3개마다 줄바꿈
-        if (i + 1) % 3 == 0:
-            print()
-
-    print()  # 마지막 줄 정리
-    print("=" * 60)
-
 def main():
     while True:
         show_keypad(keypad_buttons, state)
@@ -117,27 +150,64 @@ def main():
             continue
 
         index = int(choice) - 1
-        if 0 <= index < len(keypad_buttons):
-            btn = keypad_buttons[index]
-
-            # cd 버튼은 change_directory()로 분기
-            if btn.command == "cd":
-                result = change_directory(state)
-
-            # 인자가 필요한 명령어는 추가 입력을 받아서 붙임
-            elif btn.command in ["mkdir", "touch", "cat", "rm", "rm -rf"]:
-                arg = input(f"'{btn.label}' 대상 입력: ").strip()
-                temp_btn = Button(btn.label, f"{btn.command} {arg}", btn.dangerous)
-                result = temp_btn.execute(state)
-
-            # 나머지는 그냥 execute()
-            else:
-                result = btn.execute(state)
-
-            if result:
-                print(result)
-        else:
+        if not (0 <= index < len(keypad_buttons)):
             print("없는 번호입니다.")
+            continue
+
+        btn = keypad_buttons[index]
+
+        # 인자 후보가 있는 명령어: 화면 전환
+        if btn.command in ["cd", "cat", "rm", "rm -rf"]:
+            arg_buttons = get_arg_buttons(btn.command, state)
+
+            if not arg_buttons:
+                # 후보가 없을 때 (빈 디렉토리 등)
+                print("선택 가능한 항목이 없습니다.")
+                continue
+
+            # 인자 선택 화면으로 전환
+            show_keypad(arg_buttons, state)
+            arg_choice = input("번호를 입력하세요 [b: 뒤로]: ").strip()
+
+            if arg_choice == 'b':
+                continue
+
+            if not arg_choice.isdigit():
+                print("숫자를 입력해주세요.")
+                continue
+
+            arg_index = int(arg_choice) - 1
+            if not (0 <= arg_index < len(arg_buttons)):
+                print("없는 번호입니다.")
+                continue
+
+            selected = arg_buttons[arg_index]
+
+            if btn.command == "cd":
+                # cd는 change_directory 대신 직접 처리
+                try:
+                    os.chdir(selected.label)
+                    state["current_dir"] = os.getcwd()
+                    result = f"✅ {state['current_dir']} 로 이동했습니다."
+                except FileNotFoundError:
+                    result = f"❌ '{selected.label}' 폴더를 찾을 수 없습니다."
+            else:
+                result = selected.execute(state)
+
+        # mkdir, touch
+        elif btn.command in ["mkdir", "touch"]:
+            prompt = ARG_PROMPTS[btn.command]
+            arg = input(f"{prompt} [b: 뒤로]: ").strip()
+            if arg == 'b':
+                continue
+            temp_btn = Button(btn.label, f"{btn.command} {arg}", btn.dangerous)
+            result = temp_btn.execute(state)
+
+        else:
+            result = btn.execute(state)
+
+        if result:
+            print(result)
 
 if __name__ == "__main__":
     main()
