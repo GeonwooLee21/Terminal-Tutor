@@ -57,20 +57,6 @@ def warn_user(button):
             print("잘못된 입력입니다.")
             continue
 
-def change_directory(state):
-    # 1. 이동할 폴더 이름을 입력받음
-    target = input("이동할 폴더 이름 입력: ").strip()
-
-    try:
-        # 2. os.chdir()로 이동을 시도
-        os.chdir(target)
-        # 3. 성공하면 state의 경로를 새 경로로 업데이트
-        state["current_dir"] = os.getcwd()
-        return f"✅ {state['current_dir']} 로 이동했습니다."
-    except FileNotFoundError:
-        # 4. 실패하면 오류 메시지를 반환 및 기존 경로 유지
-        return f"❌ '{target}' 폴더를 찾을 수 없습니다."
-
 def get_arg_buttons(command, state):
     entries = os.listdir(state["current_dir"])
 
@@ -184,7 +170,6 @@ def main():
             selected = arg_buttons[arg_index]
 
             if btn.command == "cd":
-                # cd는 change_directory 대신 직접 처리
                 try:
                     os.chdir(selected.label)
                     state["current_dir"] = os.getcwd()
