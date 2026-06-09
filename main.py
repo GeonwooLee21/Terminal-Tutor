@@ -1,15 +1,16 @@
 # Terminal Keypad - main.py
-import os
-import subprocess
+import os # By Claude: For Exploring Directory
+import subprocess # By Claude: For Executing Terminal Command
 
+# By Claude: For Rendering Terminal UI
 from rich.console import Console
 from rich.table import Table
-from rich.rule import Rule # By Claude : UI에서의 가변 길이 선
+from rich.rule import Rule # By Claude: UI에서의 가변 길이 선
 
 console = Console()
 
 state = {
-    "mode": "",                 # 현재 모드 (튜토리얼 후 "beginner" 또는 "expert"로 설정됨)
+    "mode": "",                 # 현재 모드 (온보딩 후 "beginner" 또는 "expert"로 설정됨)
     "show_command": False,      # 명령어명 토글 상태
     "current_dir": os.getcwd(), # 현재 경로
     "last_output": "",          # 마지막 명령어 출력
@@ -43,29 +44,18 @@ class Button:
         # 4. 실행 결과 반환
         return state["last_output"]
 
-
-# 1. "터미널을 처음 사용해 보시나요? [Y/N]" 출력
-# 2. Y 입력 시:
-#    - 환영 메시지 출력
-#    - state["mode"] = "beginner" 로 설정
-# 3. N 입력 시:
-#    - "Terminal Keypad는 터미널이 낯선 분들을 위해..." 메시지 출력
-#    - "그래도 한번 둘러보시겠습니까? [Y/N]" 출력
-#    - Y → state["mode"] = "expert"
-#    - N → 프로그램 종료
-# 4. Y/N 외 입력 시 다시 물어봄 (warn_user처럼 while True 루프)
 def onboarding():
     while True:
-        # 2. 사용자에게 y/n 입력을 받음
+        # 1. 사용자에게 y/n 입력을 받음
         answer = input("터미널을 처음 사용해 보시나요? [y/n]: ").strip()
 
-        # 3. y면 True, n이면 False를 반환
+        # 2. y면 항상 True, n->y이면 True, n->n이면 False를 반환
         if answer == "y":
             state["mode"] = "beginner"
             input(f"환영합니다. Terminal Keypad는 사용자님이 터미널 환경에 익숙해질 수 있도록 도움을 주는 프로그램입니다.\n"
                   f"본 프로그램에서 제공되는 터미널 명령어들을 통해 터미널에 익숙해지세요.\n"
                   f"그리고 터미널에 익숙해 졌다면 저에게 말씀해 주세요! [Enter]\n")
-            print("\033[2J\033[3J\033[H", end="") # By Claude : macOS 터미널에서 clear는 화면을 밀어올릴 뿐, 스크롤 버퍼를 지우지 않음. 버퍼까지 지우려면 ANSI 이스케이프 코드를 직접 출력해야 함.
+            print("\033[2J\033[3J\033[H", end="") # By Claude: macOS 터미널에서 clear는 화면을 밀어올릴 뿐, 스크롤 버퍼를 지우지 않음. 버퍼까지 지우려면 ANSI 이스케이프 코드를 직접 출력해야 함.
             return True
         elif answer == "n":
             while True:
@@ -102,16 +92,30 @@ def warn_user(button):
             print("잘못된 입력입니다.")
             continue
 
+# By Claude: List Comprehension
 def get_arg_buttons(command, state):
+    # 현재 디렉토리 안에 있는 모든 파일·폴더 이름을 리스트로 가져옴(숨김 파일도 포함)
     entries = os.listdir(state["current_dir"])
 
     if command == "cd":
         folders = [e for e in entries if os.path.isdir(os.path.join(state["current_dir"], e))]
-        targets = ["..", "."] + sorted(folders)
+        dot_entries = ["..", "."]
+        targets = dot_entries + sorted(folders)
     else:
         targets = sorted(entries)
 
-    return [Button(label=t, command=f"{command} {t}") for t in targets]
+    # "cd .."와 같은 인자를 포함한 명령어 객체들을 생성 후 반환
+    Button_list = []
+    for t in targets:
+        if t in ["..", "."]:
+            if t == "..":
+                dot_label = ".." if state["mode"] == "expert" else "..(상위 폴더로 이동)"
+            else:
+                dot_label = "." if state["mode"] == "expert" else ".(현재 폴더)"
+            Button_list.append(Button(label=dot_label, command=f"{command} {t}"))
+        else:
+            Button_list.append(Button(label=t, command=f"{command} {t}"))
+    return Button_list
 
 def show_keypad(buttons, state, is_main=False):
     console.print(f"\n 📁 현재 위치: [bold cyan]{state['current_dir']}[/bold cyan]\n")
@@ -125,11 +129,10 @@ def show_keypad(buttons, state, is_main=False):
     row = []
     for i, btn in enumerate(buttons):
         # 모드에 따른 출력 형식 지정
-        if state["mode"] == "beginner":
-            display_format = btn.label
-        else: # state["mode"] == "expert":
+        if state["mode"] == "expert" and is_main:
             display_format = btn.command
-
+        else:
+            display_format = btn.label
         
         # 비기너 모드 중, 0 입력 시 명령어명 표시
         if state["mode"] == "beginner" and state["show_command"] and is_main:
@@ -145,7 +148,7 @@ def show_keypad(buttons, state, is_main=False):
 
         # row의 크기가 3이 되면 테이블에 추가 후, row 비움
         if len(row) == 3:
-            table.add_row(*row)
+            table.add_row(*row) # By Claude: List Unpacking
             row = []
 
     # 남은 버튼 처리 (버튼 수가 3의 배수가 아닐 때)
@@ -161,8 +164,15 @@ def show_keypad(buttons, state, is_main=False):
             print("\n* 각 명령어의 이름을 보이지 않게 하고 싶다면 [0]을 입력하세요.")
         else:
             print("\n* 각 명령어의 이름을 알고 싶다면 [0]을 입력하세요.")
-    console.print(Rule(style="grey50")) # By Claude
-    # console.print("─" * 40)
+        print("* 터미널에 익숙해지셨다면 [g]를 입력하세요.")
+    console.print(Rule(style="grey50"))
+
+def graduation():
+    print("\033[2J\033[3J\033[H", end="")
+    console.print(f"터미널에 익숙해지셨군요!")
+    console.print(f"더 이상 Terminal Keypad가 필요 없으시다면, 아래 명령어로 직접 삭제하실 수 있습니다:\n")
+    console.print("[bold red]rm -rf terminal_keypad/[/bold red]", justify="center")
+    input(f"\n앞으로의 터미널 생활에 행운이 있기를 바랍니다! [Enter]\n")
 
 ARG_PROMPTS = {
     "mkdir": "생성할 폴더명을 입력하세요",
@@ -202,6 +212,10 @@ def main():
             print("종료합니다.")
             break
 
+        if state["mode"] == "beginner" and choice == 'g':
+            graduation()
+            break
+
         if state["mode"] == "beginner" and choice == '0':
             state["show_command"] = not state["show_command"]
             continue
@@ -221,8 +235,8 @@ def main():
         if btn.command in ["cd", "cat", "rm", "rm -rf"]:
             arg_buttons = get_arg_buttons(btn.command, state)
 
+            # 후보가 없을 때 (빈 디렉토리 등)
             if not arg_buttons:
-                # 후보가 없을 때 (빈 디렉토리 등)
                 print("선택 가능한 항목이 없습니다.")
                 continue
 
@@ -246,7 +260,7 @@ def main():
 
             if btn.command == "cd":
                 try:
-                    os.chdir(selected.label)
+                    os.chdir(selected.command.replace(f"{btn.command} ", ""))
                     state["current_dir"] = os.getcwd()
                     result = f"✅ {state['current_dir']} 로 이동했습니다."
                 except FileNotFoundError:
