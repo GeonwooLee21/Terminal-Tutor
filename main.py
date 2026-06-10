@@ -1,6 +1,10 @@
 # Terminal Keypad - main.py
-import os # By Claude: For Exploring Directory
-import subprocess # By Claude: For Executing Terminal Command
+
+# By Claude: For Exploring Directory
+import os
+
+# By Claude: For Executing Terminal Command
+import subprocess 
 
 # By Claude: For Rendering Terminal UI
 from rich.console import Console
@@ -24,12 +28,7 @@ class Button:
         self.dangerous = dangerous # dangerous: 위험한 명령어 여부 (True면 경고 표시)
 
     def execute(self, state):
-        # 1. self.dangerous가 True면 warn_user()를 호출
-        if self.dangerous:
-            if not warn_user(self):
-                return
-
-        # 2. subprocess로 self.command를 실행 
+        # 1. subprocess로 self.command를 실행 
         result = subprocess.run(
             self.command, 
             shell=True, 
@@ -38,10 +37,10 @@ class Button:
             cwd=state["current_dir"]
         )
         
-        # 3. 실행 결과를 state에 저장 (출력 없으면 에러 메시지 저장)
+        # 2. 실행 결과를 state에 저장 (출력 없으면 에러 메시지 저장)
         state["last_output"] = result.stdout or result.stderr
 
-        # 4. 실행 결과 반환
+        # 3. 실행 결과 반환
         return state["last_output"]
 
 def onboarding():
@@ -80,11 +79,12 @@ def warn_user(button):
     # 1. 위험 경고 메시지를 출력
     print(f"⚠️  '{button.command}' 는 위험한 명령어입니다!")
 
+    # 2. 서브 루프 시작 (y/n 입력 단계)
     while True:
-        # 2. 사용자에게 y/n 입력을 받음
+        # 사용자에게 y/n 입력을 받음
         answer = input("실행하시겠습니까? [y/n]: ").strip()
 
-        # 3. y면 True, n이면 False를 반환
+        # y면 True, n이면 False를 반환
         if answer == "y":
             return True
         elif answer == "n":
@@ -175,6 +175,7 @@ def graduation():
     console.print("[bold red]rm -rf terminal_keypad/[/bold red]", justify="center")
     input(f"\n앞으로의 터미널 생활에 행운이 있기를 바랍니다! [Enter]\n")
 
+# By Claude:
 ARG_PROMPTS = {
     "mkdir": "생성할 폴더명을 입력하세요",
     "touch": "생성할 파일명을 입력하세요",
@@ -199,93 +200,144 @@ keypad_buttons = [
     Button(label='폴더 삭제', command='rm -rf', dangerous=True)
 ]
 
-# main 함수 추가 사항: while True 루프가 시작되기 전에 onboarding()을 호출하고, 
-# 반환값이 False면 (N→N 선택) 프로그램을 종료
+def run_simple(btn, state):
+    # 1. btn.execute(state) 호출
+    result = btn.execute(state)
+    
+    # 2. 결과 반환
+    return result
+
+def run_with_input(btn, state):
+    # 1. ARG_PROMPTS에서 안내 문구 가져오기
+    prompt = ARG_PROMPTS[btn.command]
+    
+    # 2. 서브 루프 시작 (인자 입력 단계)
+    while True:
+        # 입력 받기
+        arg = input(f"{prompt} [b: 뒤로]: ").strip()
+
+        # 'b': None 반환 (메인 루프 복귀 신호)
+        if arg == 'b': 
+            return None
+        
+        # 빈 입력: 멘트 출력 후 재입력 (서브 루프)
+        elif not arg:
+            print("디렉터리 또는 파일명을 입력해주세요.")
+            continue
+
+        # 정상 입력: 명령어 실행 후 결과 반환
+        else:
+            temp_btn = Button(btn.label, f"{btn.command} {arg}", btn.dangerous)
+            result = temp_btn.execute(state)
+            return result
+
+def run_with_selection(btn, state):
+    # 1. get_arg_buttons() 호출
+    arg_buttons = get_arg_buttons(btn.command, state)
+
+    if not arg_buttons: # 빈 리스트: 멘트 출력 후 None 반환
+        print("선택 가능한 항목이 없습니다.")
+        return None
+    
+    # 2. 서브 루프 시작 (인자 입력 단계)
+    while True:
+        # show_keypad() 출력
+        show_keypad(arg_buttons, state)
+        
+        # 입력 받기
+        arg_choice = input("번호를 입력하세요 [b: 뒤로]: ").strip()
+        
+        # 'b': None 반환
+        if arg_choice == 'b':
+            return None
+
+        # 숫자 아님 / 범위 초과: 멘트 출력 후 서브 루프 재수행
+        if not arg_choice.isdigit():
+            print("[*] 안의 숫자와 문자만 입력하세요")
+            continue
+        arg_index = int(arg_choice) - 1
+        if not (0 <= arg_index < len(arg_buttons)):
+            print("[*] 안의 숫자와 문자만 입력하세요")
+            continue
+    
+        # 정상 선택: 명령어 실행 후 결과 반환
+        selected = arg_buttons[arg_index]
+        if btn.command == "cd":
+            try:
+                os.chdir(selected.command.replace(f"{btn.command} ", ""))
+                state["current_dir"] = os.getcwd()
+                result = f"✅ {state['current_dir']} 로 이동했습니다."
+            except FileNotFoundError:
+                result = f"❌ '{selected.label}' 폴더를 찾을 수 없습니다."
+            return result
+        else:
+            result = selected.execute(state)
+            return result
+
 def main():
+    # 1. 온보딩 실행, False 반환 시 종료
     if not onboarding():
         return
 
+    # 2. 메인 루프 시작
     while True:
+        # 3. 키패드 출력
         show_keypad(keypad_buttons, state, is_main=True)
-        choice = input("번호를 입력하세요 [q: 종료]: ").strip()
 
+        # 4. 입력 받기
+        choice = input("번호를 입력하세요 [q: 종료]: ").strip()
+        
+        # --- case2: 프로그램 내장 기능 ---
+        # 5. [q]: 종료 멘트 출력 후 메인 루프 탈출
         if choice == 'q':
             print("종료합니다.")
             break
-
+        
+        # 6. [g]: graduation() 호출 후 메인 루프 탈출 (beginner 모드일 때만)
         if state["mode"] == "beginner" and choice == 'g':
             graduation()
             break
-
+        
+        # 7. [0]: 명령어명 토글 후 메인 루프 재수행 (beginner 모드일 때만)
         if state["mode"] == "beginner" and choice == '0':
             state["show_command"] = not state["show_command"]
             print("\033[2J\033[3J\033[H", end="")
             continue
-
+        
+        # --- case3: 잘못된 입력 ---
+        # 8. 유효하지 않은 입력: 멘트 출력 후 메인 루프 재수행 (isdigit() 체크 + 범위 체크 한 번에)
         if not choice.isdigit():
-            print("숫자를 입력해주세요.")
+            print("[*] 안의 숫자와 문자만 입력하세요")
             continue
 
         index = int(choice) - 1
         if not (0 <= index < len(keypad_buttons)):
-            print("없는 번호입니다.")
+            print("[*] 안의 숫자와 문자만 입력하세요")
             continue
 
+        # --- case1: 명령어 실행 ---
+        # 9. btn = keypad_buttons[index]
         btn = keypad_buttons[index]
-
-        # 인자 후보가 있는 명령어: 화면 전환
-        if btn.command in ["cd", "cat", "rm", "rm -rf"]:
-            arg_buttons = get_arg_buttons(btn.command, state)
-
-            # 후보가 없을 때 (빈 디렉토리 등)
-            if not arg_buttons:
-                print("선택 가능한 항목이 없습니다.")
+        
+        # 10. btn.dangerous이면 warn_user() 호출
+        if btn.dangerous:
+            if not warn_user(btn): # → n: 메인 루프 재수행
                 continue
-
-            while True: # 인자 번호 입력 단계에서 숫자 외 입력 시 명령어 입력 단계로 빠져나가는 걸 방지하기 위해 루프 추가
-                # 인자 선택 화면으로 전환
-                show_keypad(arg_buttons, state)
-                arg_choice = input("번호를 입력하세요 [b: 뒤로]: ").strip()
-
-                if arg_choice == 'b':
-                    break
-
-                if not arg_choice.isdigit():
-                    print("숫자를 입력해주세요.")
-                    continue
-
-                arg_index = int(arg_choice) - 1
-                if not (0 <= arg_index < len(arg_buttons)):
-                    print("없는 번호입니다.")
-                    continue
-
-                selected = arg_buttons[arg_index]
-
-                if btn.command == "cd":
-                    try:
-                        os.chdir(selected.command.replace(f"{btn.command} ", ""))
-                        state["current_dir"] = os.getcwd()
-                        result = f"✅ {state['current_dir']} 로 이동했습니다."
-                    except FileNotFoundError:
-                        result = f"❌ '{selected.label}' 폴더를 찾을 수 없습니다."
-                else:
-                    result = selected.execute(state)
-                
-                break # 인자가 정상적으로 선택 되면 루프 탈출
-
-        # mkdir, touch
+            # → y: if 블록 통과 후, 계속 진행
+        
+        # 11. btn의 종류에 따라 분기
+        #     - case1-1 (ls, pwd, clear): run_simple() 호출
+        #     - case1-2 (mkdir, touch):   run_with_input() 호출
+        #     - case1-3 (cd, cat, rm, rm-rf): run_with_selection() 호출
+        if btn.command in ["ls", "pwd", "clear"]:
+            result = run_simple(btn, state)
         elif btn.command in ["mkdir", "touch"]:
-            prompt = ARG_PROMPTS[btn.command]
-            arg = input(f"{prompt} [b: 뒤로]: ").strip()
-            if arg == 'b':
-                continue
-            temp_btn = Button(btn.label, f"{btn.command} {arg}", btn.dangerous)
-            result = temp_btn.execute(state)
-
-        else:
-            result = btn.execute(state)
-
-        if result:
+            result = run_with_input(btn, state)
+        elif btn.command in ["cd", "cat", "rm", "rm -rf"]:
+            result = run_with_selection(btn, state)
+        
+        # 12. 결과 출력
+        if result: # case1-2나 case1-3에서 b를 눌러 None을 반환되는 경우가 있으므로
             print(result)
 
 if __name__ == "__main__":
