@@ -93,6 +93,10 @@ def warn_user(button):
             print("잘못된 입력입니다.")
             continue
 
+# Terminal-Tutor 폴더 및 내부 파일 삭제 방지용 블랙리스트
+PROTECTED_FILES = {"main.py", "README.md", ".gitignore"} # rm 대상에서 제외할 파일
+PROTECTED_DIRS = {"venv", ".git", "Terminal-Tutor"} # rm -r 대상에서 제외할 폴더
+
 def get_arg_buttons(command, state):
     # 현재 디렉토리 안에 있는 모든 파일·폴더 이름을 리스트로 가져옴(숨김 파일도 포함)
     entries = os.listdir(state["current_dir"])
@@ -101,6 +105,14 @@ def get_arg_buttons(command, state):
         folders = [e for e in entries if os.path.isdir(os.path.join(state["current_dir"], e))] # By Claude: List Comprehension
         dot_entries = ["..", "."]
         targets = dot_entries + sorted(folders)
+    elif command == "rm -r":
+        targets = sorted([e for e in entries 
+                      if os.path.isdir(os.path.join(state["current_dir"], e))
+                      and e not in PROTECTED_DIRS]) # 삭제 방지용 블랙리스트에 포함된 폴더 필터링
+    elif command == "rm":
+        targets = sorted([e for e in entries 
+                      if os.path.isfile(os.path.join(state["current_dir"], e))
+                      and e not in PROTECTED_FILES]) # 삭제 방지용 블랙리스트에 포함된 파일 필터링
     else:
         targets = sorted(entries)
 
@@ -196,7 +208,7 @@ keypad_buttons = [
 
     # 삭제 (Delete) [dangerous=True]
     Button(label='파일 삭제', command='rm',     dangerous=True),
-    Button(label='폴더 삭제', command='rm -rf', dangerous=True)
+    Button(label='폴더 삭제', command='rm -r',  dangerous=True)
 ]
 
 def run_simple(btn, state):
@@ -227,8 +239,15 @@ def run_with_input(btn, state):
         # 정상 입력: 명령어 실행 후 결과 반환
         else:
             temp_btn = Button(btn.label, f"{btn.command} {arg}", btn.dangerous)
-            result = temp_btn.execute(state)
-            return result
+
+            # mkdir, touch의 경우 성공해도 stdout이 비어 있어 temp_btn.execute(state)의 리턴값이 ""임
+            temp_btn.execute(state)
+            
+            # 리턴값을 버리는 대신 성공 메시지 생성
+            if btn.command == "mkdir":
+                return f"✅ '{arg}' 폴더가 생성되었습니다."
+            elif btn.command == "touch":
+                return f"✅ '{arg}' 파일이 생성되었습니다."
 
 def run_with_selection(btn, state):
     # 1. get_arg_buttons() 호출
@@ -266,11 +285,13 @@ def run_with_selection(btn, state):
                 os.chdir(selected.command.replace(f"{btn.command} ", ""))
                 state["current_dir"] = os.getcwd()
                 result = f"✅ {state['current_dir']} 로 이동했습니다."
-            except PermissionError:
+            except PermissionError: # FileNotFoundError → PermissionError: get_arg_buttons()가 현재 존재하는 항목만 뽑아주므로 FileNotFoundError 발생 가능성 없음
                 result = f"❌ '{selected.label}' 폴더에 접근 권한이 없습니다."
             return result
         else:
             result = selected.execute(state)
+            if btn.command in ["rm", "rm -r"]: # rm, rm -r 성공 메시지 생성
+                result = f"✅ '{selected.label}' 을(를) 삭제했습니다."
             return result
 
 def main():
@@ -320,23 +341,27 @@ def main():
         
         # 10. btn.dangerous이면 warn_user() 호출
         if btn.dangerous:
-            if not warn_user(btn): # → n: 메인 루프 재수행
+            if not warn_user(btn): # n: 메인 루프 재수행
                 continue
-            # → y: if 블록 통과 후, 계속 진행
+            # y: if 블록 통과 후, 계속 진행
         
         # 11. btn의 종류에 따라 분기
         #     - case1-1 (ls, pwd, clear): run_simple() 호출
         #     - case1-2 (mkdir, touch):   run_with_input() 호출
-        #     - case1-3 (cd, cat, rm, rm-rf): run_with_selection() 호출
+        #     - case1-3 (cd, cat, rm, rm-r): run_with_selection() 호출
         if btn.command in ["ls", "pwd", "clear"]:
             result = run_simple(btn, state)
         elif btn.command in ["mkdir", "touch"]:
             result = run_with_input(btn, state)
-        elif btn.command in ["cd", "cat", "rm", "rm -rf"]:
+        elif btn.command in ["cd", "cat", "rm", "rm -r"]:
             result = run_with_selection(btn, state)
         
         # 12. 결과 출력
-        if result: # case1-2나 case1-3에서 b를 눌러 None을 반환되는 경우가 있으므로
+        if result is None: # case1-2나 case1-3에서 b를 눌러 None이 반환되는 경우
+            pass
+        elif result == "": # cat 결과가 빈 파일인 경우
+            print("빈 파일입니다.")
+        else:
             print(result)
 
 if __name__ == "__main__":
