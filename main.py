@@ -73,9 +73,9 @@ def onboarding():
             print("잘못된 입력입니다.")
             continue
 
-def warn_user(button):
+def warn_user():
     # 1. 위험 경고 메시지를 출력
-    print(f"⚠️  '{button.command}' 는 위험한 명령어입니다!")
+    print(f"⚠️  위험한 명령어입니다!")
 
     # 2. 서브 루프 시작 (y/n 입력 단계)
     while True:
@@ -118,20 +118,21 @@ def get_arg_buttons(command, state):
         targets = sorted(entries)
 
     # "cd .."와 같은 인자를 포함한 명령어 객체들을 생성 후 반환
-    Button_list = []
+    button_list = []
     for t in targets:
         if t in ["..", "."]:
             if t == "..":
                 dot_label = ".." if state["mode"] == "normal" else "..(상위 폴더로 이동)"
             else:
                 dot_label = "." if state["mode"] == "normal" else ".(현재 폴더)"
-            Button_list.append(Button(label=dot_label, command=f"{command} {t}"))
+            button_list.append(Button(label=dot_label, command=f"{command} {t}"))
         else:
-            Button_list.append(Button(label=t, command=f"{command} {t}"))
-    return Button_list
+            button_list.append(Button(label=t, command=f"{command} {t}"))
+    return button_list
 
 def show_keypad(buttons, state, is_main=False):
-    console.print(f"\n 📁 현재 위치: [bold cyan]{state['current_dir']}[/bold cyan]\n")
+    if is_main:
+        console.print(f" 📁 현재 위치: [bold cyan]{state['current_dir']}[/bold cyan]\n")
 
     table = Table(show_header=False, box=None, padding=(0, 2))
     table.add_column()
@@ -182,16 +183,10 @@ def show_keypad(buttons, state, is_main=False):
 
 def graduation():
     print("\033[2J\033[3J\033[H", end="")
-    console.print(f"터미널에 익숙해지셨군요!")
-    console.print(f"더 이상 Terminal Tutor가 필요 없으시다면, 아래 명령어로 직접 삭제하실 수 있습니다:\n")
+    console.print("터미널에 익숙해지셨군요!")
+    console.print("더 이상 Terminal Tutor가 필요 없으시다면, 아래 명령어로 직접 삭제하실 수 있습니다:\n")
     console.print("[bold red]rm -rf Terminal-Tutor/[/bold red]", justify="center")
-    input(f"\n앞으로의 터미널 생활에 행운이 있기를 바랍니다! [Enter]\n")
-
-# By Claude:
-ARG_PROMPTS = {
-    "mkdir": "생성할 폴더명을 입력하세요",
-    "touch": "생성할 파일명을 입력하세요",
-}
+    input("\n앞으로의 터미널 생활에 행운이 있기를 바랍니다! [Enter]\n")
 
 keypad_buttons = [
     # 탐색 (Navigation)
@@ -218,6 +213,12 @@ def run_simple(btn, state):
     
     # 2. 결과 반환
     return result
+
+# By Claude:
+ARG_PROMPTS = {
+    "mkdir": "생성할 폴더명을 입력하세요",
+    "touch": "생성할 파일명을 입력하세요"
+}
 
 def run_with_input(btn, state):
     # 1. ARG_PROMPTS에서 안내 문구 가져오기
@@ -250,6 +251,13 @@ def run_with_input(btn, state):
             elif btn.command == "touch":
                 return f"✅ '{arg}' 파일이 생성되었습니다."
 
+SELECTION_PROMPTS = {
+    "cd":    "이동할 폴더의 번호를 입력하세요",
+    "cat":   "확인할 파일의 번호를 입력하세요",
+    "rm":    "삭제할 파일의 번호를 입력하세요",
+    "rm -r": "삭제할 폴더의 번호를 입력하세요"
+}
+
 def run_with_selection(btn, state):
     # 1. get_arg_buttons() 호출
     arg_buttons = get_arg_buttons(btn.command, state)
@@ -260,11 +268,14 @@ def run_with_selection(btn, state):
     
     # 2. 서브 루프 시작 (인자 입력 단계)
     while True:
+        print()
+
         # show_keypad() 출력
         show_keypad(arg_buttons, state)
         
         # 입력 받기
-        arg_choice = input("번호를 입력하세요 [b: 뒤로]: ").strip()
+        prompt = SELECTION_PROMPTS.get(btn.command, "번호를 입력하세요") # 키 없으면 기본 문구로 반환
+        arg_choice = input(f"{prompt} [b: 뒤로]: ").strip()
         
         # 'b': None 반환
         if arg_choice == 'b':
@@ -302,6 +313,8 @@ def main():
 
     # 2. 메인 루프 시작
     while True:
+        console.print(Rule(style="grey50"))
+
         # 3. 키패드 출력
         show_keypad(keypad_buttons, state, is_main=True)
 
@@ -348,7 +361,7 @@ def main():
         
         # 10. btn.dangerous이면 warn_user() 호출
         if btn.dangerous:
-            if not warn_user(btn): # n: 메인 루프 재수행
+            if not warn_user(): # n: 메인 루프 재수행
                 continue
             # y: if 블록 통과 후, 계속 진행
         
