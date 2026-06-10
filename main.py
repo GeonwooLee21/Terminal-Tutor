@@ -52,15 +52,16 @@ def onboarding():
         # 2. y면 항상 True, n->y이면 True, n->n이면 False를 반환
         if answer == "y":
             state["mode"] = "beginner"
-            input(f"환영합니다. Terminal Keypad는 사용자님이 터미널 환경에 익숙해질 수 있도록 도움을 주는 프로그램입니다.\n"
+            input(f"터미널 세상에 오신 걸 환영합니다!\n"
+                  f"Terminal Tutor는 사용자님이 터미널 환경에 익숙해질 수 있도록 도움을 주는 프로그램입니다.\n"
                   f"본 프로그램에서 제공되는 터미널 명령어들을 통해 터미널에 익숙해지세요.\n"
                   f"그리고 터미널에 익숙해 졌다면 저에게 말씀해 주세요! [Enter]\n")
             print("\033[2J\033[3J\033[H", end="") # By Claude: macOS 터미널에서 clear는 화면을 밀어올릴 뿐, 스크롤 버퍼를 지우지 않음. 버퍼까지 지우려면 ANSI 이스케이프 코드를 직접 출력해야 함.
             return True
         elif answer == "n":
             while True:
-                answer = input(f"Terminal Keypad는 터미널 환경이 낯선 분들을 위해 설계된 프로그램입니다.\n"
-                               f"터미널에 이미 익숙하시다면 기존 터미널 환경이 더 편하실 수도 있습니다.\n"
+                answer = input(f"Terminal Tutor는 터미널 환경이 낯선 분들을 위해 설계된 프로그램입니다.\n"
+                               f"터미널이 이미 익숙하시다면 기존 터미널 환경이 더 편하실 수도 있습니다.\n"
                                f"그래도 한번 둘러보시겠습니까? [y/n]\n").strip()
                 if answer == "y":
                     state["mode"] = "expert"
@@ -170,7 +171,7 @@ def show_keypad(buttons, state, is_main=False):
 def graduation():
     print("\033[2J\033[3J\033[H", end="")
     console.print(f"터미널에 익숙해지셨군요!")
-    console.print(f"더 이상 Terminal Keypad가 필요 없으시다면, 아래 명령어로 직접 삭제하실 수 있습니다:\n")
+    console.print(f"더 이상 Terminal Tutor가 필요 없으시다면, 아래 명령어로 직접 삭제하실 수 있습니다:\n")
     console.print("[bold red]rm -rf terminal_keypad/[/bold red]", justify="center")
     input(f"\n앞으로의 터미널 생활에 행운이 있기를 바랍니다! [Enter]\n")
 
@@ -218,6 +219,7 @@ def main():
 
         if state["mode"] == "beginner" and choice == '0':
             state["show_command"] = not state["show_command"]
+            print("\033[2J\033[3J\033[H", end="")
             continue
 
         if not choice.isdigit():
@@ -240,33 +242,36 @@ def main():
                 print("선택 가능한 항목이 없습니다.")
                 continue
 
-            # 인자 선택 화면으로 전환
-            show_keypad(arg_buttons, state)
-            arg_choice = input("번호를 입력하세요 [b: 뒤로]: ").strip()
+            while True: # 인자 번호 입력 단계에서 숫자 외 입력 시 명령어 입력 단계로 빠져나가는 걸 방지하기 위해 루프 추가
+                # 인자 선택 화면으로 전환
+                show_keypad(arg_buttons, state)
+                arg_choice = input("번호를 입력하세요 [b: 뒤로]: ").strip()
 
-            if arg_choice == 'b':
-                continue
+                if arg_choice == 'b':
+                    break
 
-            if not arg_choice.isdigit():
-                print("숫자를 입력해주세요.")
-                continue
+                if not arg_choice.isdigit():
+                    print("숫자를 입력해주세요.")
+                    continue
 
-            arg_index = int(arg_choice) - 1
-            if not (0 <= arg_index < len(arg_buttons)):
-                print("없는 번호입니다.")
-                continue
+                arg_index = int(arg_choice) - 1
+                if not (0 <= arg_index < len(arg_buttons)):
+                    print("없는 번호입니다.")
+                    continue
 
-            selected = arg_buttons[arg_index]
+                selected = arg_buttons[arg_index]
 
-            if btn.command == "cd":
-                try:
-                    os.chdir(selected.command.replace(f"{btn.command} ", ""))
-                    state["current_dir"] = os.getcwd()
-                    result = f"✅ {state['current_dir']} 로 이동했습니다."
-                except FileNotFoundError:
-                    result = f"❌ '{selected.label}' 폴더를 찾을 수 없습니다."
-            else:
-                result = selected.execute(state)
+                if btn.command == "cd":
+                    try:
+                        os.chdir(selected.command.replace(f"{btn.command} ", ""))
+                        state["current_dir"] = os.getcwd()
+                        result = f"✅ {state['current_dir']} 로 이동했습니다."
+                    except FileNotFoundError:
+                        result = f"❌ '{selected.label}' 폴더를 찾을 수 없습니다."
+                else:
+                    result = selected.execute(state)
+                
+                break # 인자가 정상적으로 선택 되면 루프 탈출
 
         # mkdir, touch
         elif btn.command in ["mkdir", "touch"]:
