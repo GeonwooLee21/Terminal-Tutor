@@ -1,4 +1,4 @@
-# Terminal Keypad - main.py
+# Terminal Tutor - main.py
 
 # By Claude: For Exploring Directory
 import os
@@ -14,11 +14,9 @@ from rich.rule import Rule # By Claude: UI에서의 가변 길이 선
 console = Console()
 
 state = {
-    "mode": "",                 # 현재 모드 (온보딩 후 "beginner" 또는 "expert"로 설정됨)
+    "mode": "",                 # 현재 모드 (온보딩 후 "beginner" 또는 "normal"로 설정됨)
     "show_command": False,      # 명령어명 토글 상태
-    "current_dir": os.getcwd(), # 현재 경로
-    "last_output": "",          # 마지막 명령어 출력
-    "warning_mode": True        # 위험 명령어 경고
+    "current_dir": os.getcwd()  # 현재 경로
 }
 
 class Button:
@@ -36,12 +34,9 @@ class Button:
             text=True, 
             cwd=state["current_dir"]
         )
-        
-        # 2. 실행 결과를 state에 저장 (출력 없으면 에러 메시지 저장)
-        state["last_output"] = result.stdout or result.stderr
 
-        # 3. 실행 결과 반환
-        return state["last_output"]
+        # 2. 실행 결과 반환 (출력 없으면 에러 메시지 반환)
+        return result.stdout or result.stderr
 
 def onboarding():
     while True:
@@ -63,10 +58,13 @@ def onboarding():
                                f"터미널이 이미 익숙하시다면 기존 터미널 환경이 더 편하실 수도 있습니다.\n"
                                f"그래도 한번 둘러보시겠습니까? [y/n]\n").strip()
                 if answer == "y":
-                    state["mode"] = "expert"
+                    state["mode"] = "normal"
                     print("\033[2J\033[3J\033[H", end="") # By Claude
                     return True
                 elif answer == "n":
+                    console.print("\nTerminal Tutor가 필요 없으시다면 아래 명령어로 직접 삭제하실 수 있습니다:\n")
+                    console.print("[bold red]rm -rf Terminal-Tutor/[/bold red]", justify="center")
+                    console.print("\n오늘 하루 좋은 터미널 생활되세요!\n")
                     return False
                 else:
                     print("잘못된 입력입니다.")
@@ -107,12 +105,15 @@ def get_arg_buttons(command, state):
         targets = dot_entries + sorted(folders)
     elif command == "rm -r":
         targets = sorted([e for e in entries 
-                      if os.path.isdir(os.path.join(state["current_dir"], e))
-                      and e not in PROTECTED_DIRS]) # 삭제 방지용 블랙리스트에 포함된 폴더 필터링
+                          if os.path.isdir(os.path.join(state["current_dir"], e))
+                          and e not in PROTECTED_DIRS]) # 삭제 방지용 블랙리스트에 포함된 폴더 필터링
     elif command == "rm":
         targets = sorted([e for e in entries 
-                      if os.path.isfile(os.path.join(state["current_dir"], e))
-                      and e not in PROTECTED_FILES]) # 삭제 방지용 블랙리스트에 포함된 파일 필터링
+                          if os.path.isfile(os.path.join(state["current_dir"], e))
+                          and e not in PROTECTED_FILES]) # 삭제 방지용 블랙리스트에 포함된 파일 필터링
+    elif command == "cat":
+        targets = sorted([e for e in entries 
+                          if os.path.isfile(os.path.join(state["current_dir"], e))])
     else:
         targets = sorted(entries)
 
@@ -121,9 +122,9 @@ def get_arg_buttons(command, state):
     for t in targets:
         if t in ["..", "."]:
             if t == "..":
-                dot_label = ".." if state["mode"] == "expert" else "..(상위 폴더로 이동)"
+                dot_label = ".." if state["mode"] == "normal" else "..(상위 폴더로 이동)"
             else:
-                dot_label = "." if state["mode"] == "expert" else ".(현재 폴더)"
+                dot_label = "." if state["mode"] == "normal" else ".(현재 폴더)"
             Button_list.append(Button(label=dot_label, command=f"{command} {t}"))
         else:
             Button_list.append(Button(label=t, command=f"{command} {t}"))
@@ -141,7 +142,7 @@ def show_keypad(buttons, state, is_main=False):
     row = []
     for i, btn in enumerate(buttons):
         # 모드에 따른 출력 형식 지정
-        if state["mode"] == "expert" and is_main:
+        if state["mode"] == "normal" and is_main:
             display_format = btn.command
         else:
             display_format = btn.label
@@ -183,7 +184,7 @@ def graduation():
     print("\033[2J\033[3J\033[H", end="")
     console.print(f"터미널에 익숙해지셨군요!")
     console.print(f"더 이상 Terminal Tutor가 필요 없으시다면, 아래 명령어로 직접 삭제하실 수 있습니다:\n")
-    console.print("[bold red]rm -rf terminal_keypad/[/bold red]", justify="center")
+    console.print("[bold red]rm -rf Terminal-Tutor/[/bold red]", justify="center")
     input(f"\n앞으로의 터미널 생활에 행운이 있기를 바랍니다! [Enter]\n")
 
 # By Claude:
@@ -310,7 +311,13 @@ def main():
         # --- case2: 프로그램 내장 기능 ---
         # 5. [q]: 종료 멘트 출력 후 메인 루프 탈출
         if choice == 'q':
-            print("종료합니다.")
+            if state["mode"] == "normal":
+                print("\033[2J\033[3J\033[H", end="")
+                console.print("잘 둘러보셨나요? Terminal Tutor가 필요 없으시다면 아래 명령어로 직접 삭제하실 수 있습니다:\n")
+                console.print("[bold red]rm -rf Terminal-Tutor/[/bold red]", justify="center")
+                input(f"\n오늘 하루 좋은 터미널 생활되세요! [Enter]\n")
+            else:
+                print("종료합니다.")
             break
         
         # 6. [g]: graduation() 호출 후 메인 루프 탈출 (beginner 모드일 때만)
@@ -359,7 +366,7 @@ def main():
         # 12. 결과 출력
         if result is None: # case1-2나 case1-3에서 b를 눌러 None이 반환되는 경우
             pass
-        elif result == "": # cat 결과가 빈 파일인 경우
+        elif btn.command == "cat" and result == "": # cat 결과가 빈 파일인 경우
             print("빈 파일입니다.")
         else:
             print(result)
