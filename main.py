@@ -93,13 +93,12 @@ def warn_user(button):
             print("잘못된 입력입니다.")
             continue
 
-# By Claude: List Comprehension
 def get_arg_buttons(command, state):
     # 현재 디렉토리 안에 있는 모든 파일·폴더 이름을 리스트로 가져옴(숨김 파일도 포함)
     entries = os.listdir(state["current_dir"])
 
     if command == "cd":
-        folders = [e for e in entries if os.path.isdir(os.path.join(state["current_dir"], e))]
+        folders = [e for e in entries if os.path.isdir(os.path.join(state["current_dir"], e))] # By Claude: List Comprehension
         dot_entries = ["..", "."]
         targets = dot_entries + sorted(folders)
     else:
@@ -267,8 +266,8 @@ def run_with_selection(btn, state):
                 os.chdir(selected.command.replace(f"{btn.command} ", ""))
                 state["current_dir"] = os.getcwd()
                 result = f"✅ {state['current_dir']} 로 이동했습니다."
-            except FileNotFoundError:
-                result = f"❌ '{selected.label}' 폴더를 찾을 수 없습니다."
+            except PermissionError:
+                result = f"❌ '{selected.label}' 폴더에 접근 권한이 없습니다."
             return result
         else:
             result = selected.execute(state)
