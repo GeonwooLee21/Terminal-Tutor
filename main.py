@@ -240,6 +240,15 @@ def run_with_input(btn, state):
 
         # 정상 입력: 명령어 실행 후 결과 반환
         else:
+            # 이미 존재하는 이름인지 확인
+            target_path = os.path.join(state["current_dir"], arg)
+            if os.path.exists(target_path):
+                if btn.command == "mkdir":
+                    print(f"'{arg}' 폴더가 이미 존재합니다.")
+                elif btn.command == "touch":
+                    print(f"'{arg}' 파일이 이미 존재합니다.")
+                continue
+            
             temp_btn = Button(btn.label, f"{btn.command} {arg}", btn.dangerous)
 
             # mkdir, touch의 경우 성공해도 stdout이 비어 있어 temp_btn.execute(state)의 리턴값이 ""임
