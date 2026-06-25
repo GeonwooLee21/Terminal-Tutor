@@ -1,4 +1,4 @@
-# Terminal Tutor - main.py
+# Terminal Tutor - terminal_tutor.py
 
 # By Claude: For Exploring Directory
 import os
@@ -94,7 +94,7 @@ def warn_user():
             continue
 
 # Terminal-Tutor 폴더 및 내부 파일 삭제 방지용 블랙리스트
-PROTECTED_FILES = {"main.py", "README.md", ".gitignore"} # rm 대상에서 제외할 파일
+PROTECTED_FILES = {"terminal_tutor.py", "README.md", ".gitignore"} # rm 대상에서 제외할 파일
 PROTECTED_DIRS = {"venv", ".git", "Terminal-Tutor"} # rm -r 대상에서 제외할 폴더
 
 def get_arg_buttons(command, state):
