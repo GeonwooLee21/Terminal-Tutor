@@ -9,7 +9,7 @@ import subprocess
 # By Claude: For Rendering Terminal UI
 from rich.console import Console
 from rich.table import Table
-from rich.rule import Rule # By Claude: UI에서의 가변 길이 선
+from rich.rule import Rule # By Claude: Variable-length separator in UI
 
 console = Console()
 
@@ -50,7 +50,8 @@ def onboarding():
                   f"Terminal Tutor는 사용자님이 터미널 환경에 익숙해질 수 있도록 도움을 주는 프로그램입니다.\n"
                   f"본 프로그램에서 제공되는 터미널 명령어들을 통해 터미널에 익숙해지세요.\n"
                   f"그리고 터미널에 익숙해 졌다면 저에게 말씀해 주세요! [Enter]\n")
-            print("\033[2J\033[3J\033[H", end="") # By Claude: macOS 터미널에서 clear는 화면을 밀어올릴 뿐, 스크롤 버퍼를 지우지 않음. 버퍼까지 지우려면 ANSI 이스케이프 코드를 직접 출력해야 함.
+            # By Claude: macOS에서 clear는 스크롤 버퍼를 지우지 않음. ANSI 이스케이프 코드로 직접 처리.
+            print("\033[2J\033[3J\033[H", end="")
             return True
         elif answer == "n":
             while True:
@@ -59,7 +60,8 @@ def onboarding():
                                f"그래도 한번 둘러보시겠습니까? [y/n]\n").strip()
                 if answer == "y":
                     state["mode"] = "normal"
-                    print("\033[2J\033[3J\033[H", end="") # By Claude
+                    # By Claude: macOS에서 clear는 스크롤 버퍼를 지우지 않음. ANSI 이스케이프 코드로 직접 처리.
+                    print("\033[2J\033[3J\033[H", end="")
                     return True
                 elif answer == "n":
                     console.print("\nTerminal Tutor가 필요 없으시다면 아래 명령어로 직접 삭제하실 수 있습니다:\n")
@@ -182,39 +184,18 @@ def show_keypad(buttons, state, is_main=False):
     console.print(Rule(style="grey50"))
 
 def graduation():
+    # By Claude: macOS에서 clear는 스크롤 버퍼를 지우지 않음. ANSI 이스케이프 코드로 직접 처리.
     print("\033[2J\033[3J\033[H", end="")
     console.print("터미널에 익숙해지셨군요!")
     console.print("더 이상 Terminal Tutor가 필요 없으시다면, 아래 명령어로 직접 삭제하실 수 있습니다:\n")
     console.print("[bold red]rm -rf Terminal-Tutor/[/bold red]", justify="center")
     input("\n앞으로의 터미널 생활에 행운이 있기를 바랍니다! [Enter]\n")
 
-keypad_buttons = [
-    # 탐색 (Navigation)
-    Button(label='파일 목록', command='ls'),
-    Button(label='현재 위치', command='pwd'),
-    Button(label='위치 이동', command='cd'),
-
-    # 생성 (Create)
-    Button(label='폴더 생성', command='mkdir'),
-    Button(label='파일 생성', command='touch'),
-
-    # 확인 (Inspect)
-    Button(label='파일 보기', command='cat'),
-    Button(label='화면 지우기', command='clear'),
-
-    # 삭제 (Delete) [dangerous=True]
-    Button(label='파일 삭제', command='rm',     dangerous=True),
-    Button(label='폴더 삭제', command='rm -r',  dangerous=True)
-]
-
 def run_simple(btn, state):
-    # 1. btn.execute(state) 호출
-    result = btn.execute(state)
-    
-    # 2. 결과 반환
-    return result
+    # run_with_input(), run_with_selection()과 인터페이스를 통일하기 위한 래퍼
+    return btn.execute(state)
 
-# By Claude:
+# By Claude: mkdir, touch 실행 시 사용자에게 표시할 입력 안내 문구
 ARG_PROMPTS = {
     "mkdir": "생성할 폴더명을 입력하세요",
     "touch": "생성할 파일명을 입력하세요"
@@ -315,6 +296,25 @@ def run_with_selection(btn, state):
                 result = f"✅ '{selected.label}' 을(를) 삭제했습니다."
             return result
 
+keypad_buttons = [
+    # 탐색 (Navigation)
+    Button(label='파일 목록', command='ls'),
+    Button(label='현재 위치', command='pwd'),
+    Button(label='위치 이동', command='cd'),
+
+    # 생성 (Create)
+    Button(label='폴더 생성', command='mkdir'),
+    Button(label='파일 생성', command='touch'),
+
+    # 확인 (Inspect)
+    Button(label='파일 보기', command='cat'),
+    Button(label='화면 지우기', command='clear'),
+
+    # 삭제 (Delete) [dangerous=True]
+    Button(label='파일 삭제', command='rm',     dangerous=True),
+    Button(label='폴더 삭제', command='rm -r',  dangerous=True)
+]
+
 def main():
     # 1. 온보딩 실행, False 반환 시 종료
     if not onboarding():
@@ -330,10 +330,11 @@ def main():
         # 4. 입력 받기
         choice = input("번호를 입력하세요 [q: 종료]: ").strip()
         
-        # --- case2: 프로그램 내장 기능 ---
+        # ----- case1: 프로그램 내장 기능 -----
         # 5. [q]: 종료 멘트 출력 후 메인 루프 탈출
         if choice == 'q':
             if state["mode"] == "normal":
+                # By Claude: macOS에서 clear는 스크롤 버퍼를 지우지 않음. ANSI 이스케이프 코드로 직접 처리.
                 print("\033[2J\033[3J\033[H", end="")
                 console.print("잘 둘러보셨나요? Terminal Tutor가 필요 없으시다면 아래 명령어로 직접 삭제하실 수 있습니다:\n")
                 console.print("[bold red]rm -rf Terminal-Tutor/[/bold red]", justify="center")
@@ -350,10 +351,11 @@ def main():
         # 7. [0]: 명령어명 토글 후 메인 루프 재수행 (beginner 모드일 때만)
         if state["mode"] == "beginner" and choice == '0':
             state["show_command"] = not state["show_command"]
+            # By Claude: macOS에서 clear는 스크롤 버퍼를 지우지 않음. ANSI 이스케이프 코드로 직접 처리.
             print("\033[2J\033[3J\033[H", end="")
             continue
         
-        # --- case3: 잘못된 입력 ---
+        # ----- case2: 잘못된 입력 -----
         # 8. 유효하지 않은 입력: 멘트 출력 후 메인 루프 재수행 (isdigit() 체크 + 범위 체크 한 번에)
         if not choice.isdigit():
             print("[*] 안의 숫자와 문자만 입력하세요")
@@ -364,7 +366,7 @@ def main():
             print("[*] 안의 숫자와 문자만 입력하세요")
             continue
 
-        # --- case1: 명령어 실행 ---
+        # ----- case3: 명령어 실행 -----
         # 9. btn = keypad_buttons[index]
         btn = keypad_buttons[index]
         
@@ -375,9 +377,9 @@ def main():
             # y: if 블록 통과 후, 계속 진행
         
         # 11. btn의 종류에 따라 분기
-        #     - case1-1 (ls, pwd, clear): run_simple() 호출
-        #     - case1-2 (mkdir, touch):   run_with_input() 호출
-        #     - case1-3 (cd, cat, rm, rm-r): run_with_selection() 호출
+        #     - case3-1 (ls, pwd, clear): run_simple() 호출
+        #     - case3-2 (mkdir, touch):   run_with_input() 호출
+        #     - case3-3 (cd, cat, rm, rm-r): run_with_selection() 호출
         if btn.command in ["ls", "pwd", "clear"]:
             result = run_simple(btn, state)
         elif btn.command in ["mkdir", "touch"]:
@@ -386,7 +388,7 @@ def main():
             result = run_with_selection(btn, state)
         
         # 12. 결과 출력
-        if result is None: # case1-2나 case1-3에서 b를 눌러 None이 반환되는 경우
+        if result is None: # case3-2나 case3-3에서 b를 눌러 None이 반환되는 경우
             pass
         elif btn.command == "cat" and result == "": # cat 결과가 빈 파일인 경우
             print("빈 파일입니다.")
