@@ -287,7 +287,7 @@ def run_with_selection(btn, state):
                 os.chdir(selected.command.replace(f"{btn.command} ", ""))
                 state["current_dir"] = os.getcwd()
                 result = f"✅ {state['current_dir']} 로 이동했습니다."
-            except PermissionError: # FileNotFoundError → PermissionError: get_arg_buttons()가 현재 존재하는 항목만 뽑아주므로 FileNotFoundError 발생 가능성 없음
+            except PermissionError:
                 result = f"❌ '{selected.label}' 폴더에 접근 권한이 없습니다."
             return result
         else:
@@ -379,7 +379,7 @@ def main():
         # 11. btn의 종류에 따라 분기
         #     - case3-1 (ls, pwd, clear): run_simple() 호출
         #     - case3-2 (mkdir, touch):   run_with_input() 호출
-        #     - case3-3 (cd, cat, rm, rm-r): run_with_selection() 호출
+        #     - case3-3 (cd, cat, rm, rm -r): run_with_selection() 호출
         if btn.command in ["ls", "pwd", "clear"]:
             result = run_simple(btn, state)
         elif btn.command in ["mkdir", "touch"]:
